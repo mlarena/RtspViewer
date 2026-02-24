@@ -1,0 +1,91 @@
+@{
+    ViewData["Title"] = "RTSP Viewer";
+}
+
+<style>
+    body { background: #0a0a0a; color: #fff; font-family: Arial; padding: 20px; }
+    .container { max-width: 900px; margin: 0 auto; }
+    input { width: 100%; padding: 10px; margin: 5px 0; background: #222; border: 1px solid #444; color: #fff; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    button { padding: 12px 24px; margin: 10px 5px 0 0; border: none; border-radius: 4px; cursor: pointer; }
+    .start { background: #4CAF50; color: white; }
+    .stop { background: #f44336; color: white; }
+    #videoBox { background: #000; min-height: 480px; margin-top: 20px; display: flex; align-items: center; justify-content: center; border: 2px solid #333; }
+    #videoBox.active { border-color: #4CAF50; }
+    img { max-width: 100%; display: none; }
+    #status { color: #888; }
+    .error { color: #ff4444; }
+    .loading { color: #4CAF50; }
+</style>
+
+<div class="container">
+    <h2>📹 RTSP Viewer</h2>
+    
+    <input type="text" id="url" value="rtsp://85.141.104.238:44554/channel=1&stream=0.sdp?" />
+    <div class="row">
+        <input type="text" id="user" value="admin" placeholder="Username" />
+        <input type="password" id="pass" value="SAdm!n001" placeholder="Password" />
+    </div>
+    <button class="start" onclick="start()">▶ Старт</button>
+    <button class="stop" onclick="stop()">⏹ Стоп</button>
+
+    <div id="videoBox">
+        <div id="status">Нажмите Старт</div>
+        <img id="video" onload="frameLoaded()" />
+    </div>
+</div>
+
+<script>
+    let interval;
+    let frames = 0;
+
+    async function start() {
+        const status = document.getElementById('status');
+        status.className = 'loading';
+        status.innerText = 'Подключение (ждите 5-10 сек)...';
+
+        const params = new URLSearchParams();
+        params.append('rtspUrl', document.getElementById('url').value);
+        params.append('username', document.getElementById('user').value);
+        params.append('password', document.getElementById('pass').value);
+
+        try {
+            const res = await fetch('/Video/Start', { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: params 
+            });
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('videoBox').classList.add('active');
+                document.getElementById('video').style.display = 'block';
+                status.style.display = 'none';
+                interval = setInterval(() => {
+                    document.getElementById('video').src = '/Video/Frame?' + Date.now();
+                }, 200);
+            } else {
+                status.className = 'error';
+                status.innerText = '❌ ' + data.error;
+            }
+        } catch (e) {
+            status.className = 'error';
+            status.innerText = '❌ ' + e.message;
+        }
+    }
+
+    function frameLoaded() {
+        frames++;
+        if (frames === 1) console.log('Первый кадр!');
+    }
+
+    function stop() {
+        clearInterval(interval);
+        fetch('/Video/Stop', { method: 'POST' });
+        document.getElementById('video').style.display = 'none';
+        document.getElementById('videoBox').classList.remove('active');
+        document.getElementById('status').style.display = 'block';
+        document.getElementById('status').innerText = 'Остановлено';
+        frames = 0;
+    }
+</script>
