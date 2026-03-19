@@ -1,0 +1,2 @@
+http://localhost:5100/
+rtsp://85.141.104.238:44554/user=admin&password=SAdm!n001&channel=1&stream=0.sdp?

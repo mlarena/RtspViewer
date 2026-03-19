@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Serilog;
 
 namespace RtspViewer.Services;
 
@@ -9,6 +10,7 @@ public class RtspStreamService : IDisposable
     private readonly object _lock = new();
     private bool _isRunning;
     private DateTime _lastFrameTime = DateTime.MinValue;
+    private readonly Serilog.ILogger _logger = Log.ForContext<RtspStreamService>();
 
     public string? LastError { get; private set; }
     public bool IsRunning => _isRunning;
@@ -18,7 +20,7 @@ public class RtspStreamService : IDisposable
         if (_isRunning) return;
 
         LastError = null;
-        Console.WriteLine($"[RTSP] Подключение...");
+        _logger.Information("[RTSP] Подключение к {Url}...", rtspUrl.Replace(rtspUrl, "***"));
 
         // КЛЮЧЕВЫЕ ИЗМЕНЕНИЯ:
         // -analyzeduration 10M -probesize 10M — увеличиваем время анализа потока
@@ -40,7 +42,7 @@ public class RtspStreamService : IDisposable
             "pipe:1"
         });
 
-        Console.WriteLine($"[FFmpeg] {arguments.Replace(rtspUrl, "***")}");
+        _logger.Debug("[FFmpeg] {Arguments}", arguments.Replace(rtspUrl, "***"));
 
         _ffmpegProcess = new Process
         {
@@ -59,7 +61,7 @@ public class RtspStreamService : IDisposable
         {
             if (!string.IsNullOrEmpty(e.Data))
             {
-                Console.WriteLine($"[FFmpeg] {e.Data}");
+                _logger.Information("[FFmpeg] {Data}", e.Data);
                 if (e.Data.Contains("error", StringComparison.OrdinalIgnoreCase) || 
                     e.Data.Contains("failed", StringComparison.OrdinalIgnoreCase))
                     LastError = e.Data;
@@ -120,20 +122,20 @@ public class RtspStreamService : IDisposable
                     
                     frameCount++;
                     if (frameCount % 30 == 0)
-                        Console.WriteLine($"[RTSP] Получено кадров: {frameCount}");
+                        _logger.Information("[RTSP] Получено кадров: {Count}", frameCount);
                     
                     frameBuffer = frameBuffer.Skip(end + 2).ToList();
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[RTSP] Ошибка: {ex.Message}");
+                _logger.Error(ex, "[RTSP] Ошибка при чтении кадров");
                 break;
             }
         }
         
         _isRunning = false;
-        Console.WriteLine($"[RTSP] Поток завершён. Всего кадров: {frameCount}");
+        _logger.Information("[RTSP] Поток завершён. Всего кадров: {Count}", frameCount);
     }
 
     private int FindMarker(byte[] data, byte[] marker, int startIndex = 0)

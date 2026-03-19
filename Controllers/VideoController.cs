@@ -18,17 +18,12 @@ public class VideoController : Controller
             _streamService = new RtspStreamService();
 
             // Собираем URL с credentials
-            string fullUrl;
-            if (!string.IsNullOrEmpty(username))
+            string fullUrl = rtspUrl;
+            if (!string.IsNullOrEmpty(username) && !rtspUrl.Contains("@"))
             {
-                // Экранируем спецсимволы в пароле!
-                var safeUser = Uri.EscapeDataString(username);
-                var safePass = Uri.EscapeDataString(password);
-                fullUrl = rtspUrl.Replace("://", $"://{safeUser}:{safePass}@");
-            }
-            else
-            {
-                fullUrl = rtspUrl;
+                // Для RTSP часто лучше НЕ экранировать пароль, если там простые спецсимволы
+                // или использовать только базовую замену. FFmpeg сам разберет строку.
+                fullUrl = rtspUrl.Replace("://", $"://{username}:{password}@");
             }
 
             Console.WriteLine($"[Controller] URL: {rtspUrl}");
