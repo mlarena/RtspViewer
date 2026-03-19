@@ -19,10 +19,8 @@ public class VideoController : Controller
 
             // Собираем URL с credentials
             string fullUrl = rtspUrl;
-            if (!string.IsNullOrEmpty(username) && !rtspUrl.Contains("@"))
+            if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password) && !rtspUrl.Contains("@"))
             {
-                // Для RTSP часто лучше НЕ экранировать пароль, если там простые спецсимволы
-                // или использовать только базовую замену. FFmpeg сам разберет строку.
                 fullUrl = rtspUrl.Replace("://", $"://{username}:{password}@");
             }
 

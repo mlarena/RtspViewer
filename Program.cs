@@ -1,3 +1,5 @@
+using Microsoft.EntityFrameworkCore;
+using RtspViewer.Models;
 using RtspViewer.Services;
 using Serilog;
 using Serilog.Events;
@@ -13,6 +15,11 @@ Log.Logger = new LoggerConfiguration()
     .CreateLogger();
 
 builder.Host.UseSerilog();
+
+// Настройка БД
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(connectionString));
 
 // Добавляем сервисы
 builder.Services.AddControllersWithViews();
