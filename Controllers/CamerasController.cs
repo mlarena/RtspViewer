@@ -31,8 +31,69 @@ namespace RtspViewer.Controllers
                 .Include(c => c.MonitoringPost)
                 .FirstOrDefaultAsync(m => m.Id == id);
             if (camera == null) return NotFound();
+
+            ViewBag.LastSnapshots = await _context.Snapshots
+                .Where(s => s.CameraId == id)
+                .OrderByDescending(s => s.CreatedAt)
+                .Take(6)
+                .ToListAsync();
             
             return View(camera);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> TakeSnapshot(int id)
+        {
+            var camera = await _context.Cameras.FindAsync(id);
+            if (camera == null) return Json(new { success = false, error = "Камера не найдена" });
+
+            var frame = _streamService.GetFrame();
+            if (frame == null) return Json(new { success = false, error = "Не удалось получить кадр из потока" });
+
+            try
+            {
+                var fileName = $"{Guid.NewGuid()}.jpg";
+                var relativePath = Path.Combine("snapshots", id.ToString(), fileName);
+                var absolutePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", relativePath);
+
+                Directory.CreateDirectory(Path.GetDirectoryName(absolutePath)!);
+                await System.IO.File.WriteAllBytesAsync(absolutePath, frame);
+
+                var snapshot = new Snapshot
+                {
+                    CameraId = id,
+                    FilePath = "/" + relativePath.Replace("\\", "/"),
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.Snapshots.Add(snapshot);
+                await _context.SaveChangesAsync();
+
+                return Json(new { success = true, filePath = snapshot.FilePath, createdAt = snapshot.CreatedAt.ToString("HH:mm:ss") });
+            }
+            catch (Exception ex)
+            {
+                return Json(new { success = false, error = ex.Message });
+            }
+        }
+
+        public async Task<IActionResult> Snapshots(int? cameraId, DateTime? from, DateTime? to)
+        {
+            var query = _context.Snapshots.Include(s => s.Camera).AsQueryable();
+
+            if (cameraId.HasValue)
+                query = query.Where(s => s.CameraId == cameraId);
+            
+            if (from.HasValue)
+                query = query.Where(s => s.CreatedAt >= from.Value.ToUniversalTime());
+            
+            if (to.HasValue)
+                query = query.Where(s => s.CreatedAt <= to.Value.ToUniversalTime());
+
+            var snapshots = await query.OrderByDescending(s => s.CreatedAt).ToListAsync();
+            ViewBag.Cameras = new SelectList(await _context.Cameras.ToListAsync(), "Id", "Name", cameraId);
+            
+            return View(snapshots);
         }
 
         // Создание/подключение новой камеры

@@ -71,7 +71,27 @@
                 </div>
                 <div class="card-body p-2">
                     <div id="snapshots" class="row g-2">
-                        <div class="col-12 text-center text-muted small py-4">Снимков пока нет</div>
+                        @if (ViewBag.LastSnapshots != null && ((List<RtspViewer.Models.Snapshot>)ViewBag.LastSnapshots).Any())
+                        {
+                            @foreach (var snap in (List<RtspViewer.Models.Snapshot>)ViewBag.LastSnapshots)
+                            {
+                                <div class="col-6">
+                                    <div class="position-relative border rounded overflow-hidden bg-light" style="height: 100px;">
+                                        <img src="@snap.FilePath" class="w-100 h-100 object-fit-cover" onclick="window.open(this.src)" style="cursor:pointer" />
+                                        <div class="position-absolute bottom-0 start-0 w-100 bg-dark bg-opacity-50 text-white p-1" style="font-size: 0.65rem;">
+                                            @snap.CreatedAt.ToLocalTime().ToString("HH:mm:ss")
+                                        </div>
+                                    </div>
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="col-12 text-center text-muted small py-4">Снимков пока нет</div>
+                        }
+                    </div>
+                    <div class="d-grid mt-3">
+                        <a asp-action="Snapshots" asp-route-cameraId="@Model.Id" class="btn btn-outline-primary btn-sm">Все снимки</a>
                     </div>
                 </div>
             </div>
@@ -140,9 +160,38 @@
             startStream();
         }
 
-        function takeSnapshot() {
-            // Логика снимка
-            alert('Снимок сохранен');
+        async function takeSnapshot() {
+            try {
+                const response = await fetch(`/Cameras/TakeSnapshot/${cameraId}`, { method: 'POST' });
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Добавляем новый снимок в начало списка
+                    const container = document.getElementById('snapshots');
+                    const emptyMsg = container.querySelector('.col-12');
+                    if (emptyMsg) emptyMsg.remove();
+
+                    const html = `
+                        <div class="col-6">
+                            <div class="position-relative border rounded overflow-hidden bg-light" style="height: 100px;">
+                                <img src="${data.filePath}" class="w-100 h-100 object-fit-cover" onclick="window.open(this.src)" style="cursor:pointer" />
+                                <div class="position-absolute bottom-0 start-0 w-100 bg-dark bg-opacity-50 text-white p-1" style="font-size: 0.65rem;">
+                                    ${data.createdAt}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('afterbegin', html);
+                    
+                    // Ограничиваем до 6 снимков
+                    const items = container.querySelectorAll('.col-6');
+                    if (items.length > 6) items[items.length - 1].remove();
+                } else {
+                    alert('Ошибка: ' + data.error);
+                }
+            } catch (e) {
+                alert('Ошибка при создании снимка');
+            }
         }
 
         // Запуск при загрузке
